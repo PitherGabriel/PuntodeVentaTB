@@ -208,3 +208,6 @@ __marimo__/
 
 # Google Services Credentials
 credentials.json
+
+# Personal documentation
+/documentation
