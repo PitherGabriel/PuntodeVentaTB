@@ -38,7 +38,7 @@ class SRIConfig:
     
     # Certificado digital
     CERTIFICADO_PATH = "certificado.p12"
-    CERTIFICADO_PASSWORD = "tu_password_aqui"  # CAMBIAR
+    CERTIFICADO_PASSWORD = "u_password_aqui"  # CAMBIAR
     
     # Directorio para almacenar XMLs
     DIR_XML_GENERADOS = "xml_generados"

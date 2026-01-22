@@ -3,7 +3,8 @@ Firma electrónica de XMLs según estándar XAdES-BES
 """
 from lxml import etree
 from signxml import XMLSigner
-from OpenSSL import crypto
+from cryptography.hazmat.primitives.serialization import pkcs12
+from cryptography.hazmat.backends import default_backend
 from config import SRIConfig
 import base64
 
@@ -19,10 +20,11 @@ class FirmaElectronica:
         try:
             with open(self.cert_path, 'rb') as f:
                 p12_data = f.read()
-            
-            self.p12 = crypto.load_pkcs12(p12_data, self.cert_password.encode())
-            self.private_key = self.p12.get_privatekey()
-            self.certificate = self.p12.get_certificate()
+                
+            # Decrypt PKCS12 data (password must be bytes)
+            private_key, certificate, additional_certs = pkcs12.load_key_and_certificates(
+                p12_data, self.cert_password, default_backend()
+            )
             
             print("✅ Certificado cargado correctamente")
         except FileNotFoundError:
