@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pos_backend import InventoryManager
-from sri_manager import SRIManager  # NUEVO
+#from sri_manager import SRIManager  # NUEVO
 from datetime import datetime
 
 app = Flask(__name__)
@@ -9,7 +9,7 @@ CORS(app)  # Permite requests desde tu frontend
 
 inventory = InventoryManager('credentials.json', 'CentroComercialTB')
 # NUEVO - Gestor de facturación SRI
-sri_manager = SRIManager()
+#sri_manager = SRIManager()
 
 @app.route('/api/inventory', methods=['GET'])
 def get_inventory():
@@ -72,11 +72,10 @@ def get_alerts():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+"""
 @app.route('/api/sale-with-invoice-sri', methods=['POST'])
 def process_sale_with_invoice_sri():
-    """
-    Procesar venta con factura electrónica SRI
-    """
+    # Procesar venta con factura electrónica SRI
     try:
         cart = request.json.get('cart', [])
         vendedor = request.json.get('vendedor', 'Sistema')
@@ -136,6 +135,7 @@ def process_sale_with_invoice_sri():
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
+"""
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(host="0.0.0.0", debug=True, port=5000)

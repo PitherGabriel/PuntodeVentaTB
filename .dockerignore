@@ -1,0 +1,43 @@
+# ===================================
+# Backend .dockerignore
+# (guardar como: backend/.dockerignore)
+# ===================================
+
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
+.venv
+venv
+env
+.env
+.git
+.gitignore
+*.md
+.vscode
+.idea
+
+# ===================================
+# Frontend .dockerignore
+# (guardar como: frontend/.dockerignore)
+# ===================================
+
+node_modules
+npm-debug.log
+build
+.git
+.gitignore
+README.md
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.vscode
+.idea
