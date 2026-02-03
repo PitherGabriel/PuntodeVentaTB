@@ -468,7 +468,9 @@ class InventoryManager:
             print_result = print_future.result()  # Blocks until print is done
             save_result = save_future.result()    # Blocks until save is done
         
+        
         # Both tasks are now complete - check results
+        print("Both tasks have ended")
         if not print_result['success']:
             return {
                 'success': False,
