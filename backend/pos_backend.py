@@ -6,8 +6,7 @@ from datetime import datetime
 import uuid
 
 # Printer
-from escpos.printer import Network, Usb
-
+from escpos.printer import Network
 
 class ReceiptPrinter: 
     def __init__(self):
@@ -15,10 +14,10 @@ class ReceiptPrinter:
         # To find IDs: lsusb (Linux) or Device Manager (Windows)
         try:
             # USB Printer
-            self.printer = Usb(0x04b8, 0x0e14)  # Replace with your RPT004 IDs
+            #self.printer = Usb(0x04b8, 0x0e14)  # Replace with your RPT004 IDs
             
             # OR Network Printer (if using WiFi/Ethernet)
-            #self.printer = Network("192.168.1.100")
+            self.printer = Network("192.168.1.100")
             
             # OR File Printer (for testing - prints to file)
             # self.printer = File("/dev/usb/lp0")
@@ -452,10 +451,10 @@ class InventoryManager:
 
         with ThreadPoolExecutor(max_workers=2) as executor:
             # Submit both tasks receipt
-            print_future = executor.submit(
-                self.printer.print_receipt, 
-                receipt_data
-            )
+            #print_future = executor.submit(
+            #    self.printer.print_receipt, 
+            #    receipt_data
+            #)
             save_future = executor.submit(
                 self.save_sale, 
                 sale_id, 
@@ -465,17 +464,17 @@ class InventoryManager:
                 )
 
             # Wait for BOTH to complete and get results
-            print_result = print_future.result()  # Blocks until print is done
+            #print_result = print_future.result()  # Blocks until print is done
             save_result = save_future.result()    # Blocks until save is done
         
         
         # Both tasks are now complete - check results
-        print("Both tasks have ended")
-        if not print_result['success']:
-            return {
-                'success': False,
-                'message': f"Error imprimiendo recibo: {print_result.get('error')}"
-            }
+        #print("Both tasks have ended")
+        #if not print_result['success']:
+        #    return {
+        #        'success': False,
+        #        'message': f"Error imprimiendo recibo: {print_result.get('error')}"
+        #    }
 
         if not save_result['success']:
             return {
