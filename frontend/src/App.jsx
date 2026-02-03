@@ -5,12 +5,12 @@ import {
   AlertTriangle,
   Plus, Minus,
   Trash2,
-  Save,
   Search, History,
-  TrendingUp, Calendar,
-  FileText, Check,
-  X, Mail, Loader, DollarSign,
-  PackagePlus
+  TrendingUp,
+  Check,
+  X, Loader,
+  PackagePlus,
+  CircleDollarSign
 } from 'lucide-react';
 
 
@@ -28,7 +28,7 @@ const LoginScreen = ({
         <div className="inline-block p-4 rounded-full mb-5">
           <img src='logo.png' className='h-35 mx-auto'></img>
         </div>
-        <h1 className="text-3xl font-bold text-gray-800">Centro Comercial TB</h1>
+        <h1 className="text-3xl font-bold text-gray-800">Comercial TB</h1>
         <p className="text-gray-600 mt-2">Inicia sesión para continuar</p>
       </div>
 
@@ -107,7 +107,7 @@ const POSSystem = () => {
   const [alerts, setAlerts] = useState([]);
   const [activeTab, setActiveTab] = useState('pos'); // pos, inventario, inventory-add, history, summary
   const [salesHistory, setSalesHistory] = useState([]);
-  const [salesSummary, setSalesSummary] = useState(null);
+  //const [salesSummary, setSalesSummary] = useState(null);
   const [vendedor, setVendedor] = useState('Sistema');
   const [receivedMoney, setReceivedMoney] = useState('');
   const [processingSale, setProcessingSale] = useState(false);
@@ -127,9 +127,9 @@ const POSSystem = () => {
   const [filterEndDate, setFilterEndDate] = useState('');
 
   // Estados para facturación
-  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-  const [processingInvoice, setProcessingInvoice] = useState(false);
-  const [invoiceResult, setInvoiceResult] = useState(null);
+  //const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  //const [processingInvoice, setProcessingInvoice] = useState(false);
+  //const [invoiceResult, setInvoiceResult] = useState(null);
   const [clienteData, setClienteData] = useState({
     identificacion: '',
     razon_social: '',
@@ -139,24 +139,30 @@ const POSSystem = () => {
   });
 
   // Estados para calculo de utilidades
-
   const [profitAnalysis, setProfitAnalysis] = useState(null);
   const [selectedPeriod, setSelectedPeriod] = useState('today');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
 
-
   const API_URL = '/api';
 
+  // Verificar autenticación al cargar
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  // Cargar inventario
   useEffect(() => {
     loadInventory();
   }, []);
 
+  // Acitivar alerta de inventario 
   useEffect(() => {
     const lowStock = inventory.filter(item => item.cantidad <= item.minStock);
     setAlerts(lowStock);
   }, [inventory]);
 
+  // Notificaciones
   const showNotification = (message, type = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3000); // Auto-hide after 3 seconds
@@ -217,6 +223,7 @@ const POSSystem = () => {
     }
   };
 
+  /*
   const loadSalesSummary = async (date = null) => {
     try {
       const url = date ? `${API_URL}/sales/summary?date=${date}` : `${API_URL}/sales/summary`;
@@ -229,6 +236,7 @@ const POSSystem = () => {
       console.error('Error cargando resumen:', error);
     }
   };
+  */
 
   // Generar código único basado en el nombre
   const generateProductCode = (nombre) => {
@@ -301,6 +309,7 @@ const POSSystem = () => {
     }
   };
 
+  // Agregar producto al carrito
   const addToCart = (product) => {
     const existingItem = cart.find(item => item.id === product.id);
 
@@ -324,6 +333,7 @@ const POSSystem = () => {
     }
   };
 
+  // Actualizar cantidad de productos en carrito
   const updateCartQuantity = (productId, delta) => {
     const product = inventory.find(p => p.id === productId);
     const cartItem = cart.find(item => item.id === productId);
@@ -347,6 +357,7 @@ const POSSystem = () => {
     ));
   };
 
+  // Eliminar producto de carrito
   const removeFromCart = (productId) => {
     setCart(cart.filter(item => item.id !== productId));
   };
@@ -457,9 +468,10 @@ const POSSystem = () => {
     setInvoiceResult(null);
   };
 
+  // Procesar venta simple
   const processSale = async () => {
     if (cart.length === 0) {
-      alert('El carrito está vacío');
+      showNotification('El carrito está vacío', 'error');
       return;
     }
 
@@ -499,7 +511,7 @@ const POSSystem = () => {
         });
 
         setInventory(updatedInventory);
-        showNotification('¡Venta procesada exitosamente!', 'success'); // Replace alert
+        showNotification('¡Venta procesada exitosamente!', 'success');
         setCart([]);
         setReceivedMoney('');
 
@@ -548,11 +560,7 @@ const POSSystem = () => {
     return true;
   });
 
-  // Verificar autenticación al cargar
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
+  // Comprobar si existe una autentificación de usuario 
   const checkAuth = async () => {
     try {
       const response = await fetch(`${API_URL}/auth/check`, {
@@ -571,6 +579,7 @@ const POSSystem = () => {
     }
   };
 
+  // Inicio de sesión del usuario
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoggingIn(true);
@@ -605,6 +614,7 @@ const POSSystem = () => {
     }
   };
 
+  // Cierre de sesión del usuario
   const handleLogout = async () => {
     try {
       await fetch(`${API_URL}/auth/logout`, {
@@ -616,12 +626,10 @@ const POSSystem = () => {
       setCurrentUser(null);
       setCart([]);
       setInventory([]);
-      showNotification('Sesión cerrada exitosamente', 'success');
     } catch (error) {
       console.error('Error al cerrar sesión:', error);
     }
   };
-
 
   return (
     <>
@@ -662,7 +670,7 @@ const POSSystem = () => {
           <div className="bg-linear-to-r from-[#008cc8] to-[#005174] text-white p-6 shadow-lg">
             <div className="flex justify-between items-center">
               <div>
-                <h1 className="text-3xl font-bold">Centro Comercial TB</h1>
+                <h1 className="text-3xl font-bold">Comercial TB</h1>
                 <p className="text-blue-100 text-sm mt-1">Gestión de Ventas e Inventario</p>
               </div>
               <div className="flex items-center gap-4">
@@ -746,7 +754,7 @@ const POSSystem = () => {
                   : 'text-gray-600 hover:text-[#008cc8]'
                   }`}
               >
-                <DollarSign size={20} />
+                <CircleDollarSign size={20} />
                 Utilidades
               </button>
 
@@ -769,16 +777,16 @@ const POSSystem = () => {
           <div className="p-6">
             {/* CAJA - Rediseñado */}
             {activeTab === 'pos' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-280px)]">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 h-[calc(100vh-210px)]">
                 {/* Búsqueda de Productos */}
                 <div className="bg-white rounded-lg shadow-lg flex flex-col">
                   <div className="p-4">
-                    <h2 className="text-xl font-bold text-gray-800 mb-4">Buscar Productos</h2>
+                    <h2 className="text-xl font-bold text-gray-800 mb-4">Productos</h2>
                     <div className="relative">
                       <Search className="absolute left-3 top-3 text-gray-400" size={20} />
                       <input
                         type="text"
-                        placeholder="Buscar por nombre o código..."
+                        placeholder="Busca por nombre o código..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008cc8]"
@@ -804,9 +812,10 @@ const POSSystem = () => {
                           <div
                             key={product.id}
                             onClick={() => addToCart(product)}
-                            className={`rounded-lg p-2 cursor-pointer transition ${product.cantidad === 0
-                              ? 'bg-gray-100 border-gray-100 cursor-not-allowed'
-                              : 'hover:shadow-md hover:border-[#008cc8]'
+                            className={`rounded-lg p-2 transition-all duration-150 
+                              ${product.cantidad === 0
+                                ? 'bg-gray-100 border-gray-100 cursor-not-allowed'
+                                : 'bg-white shadow-sm cursor-pointer hover:-translate-y-1 hover:shadow-md hover:border-[#008cc8]'
                               }`}
                           >
                             <h3 className="font-semibold text-xs text-gray-800 truncate" title={product.nombre}>
@@ -830,9 +839,8 @@ const POSSystem = () => {
                 {/* Carrito de Venta */}
                 <div className="bg-white rounded-lg shadow-lg flex flex-col">
                   <div className="p-4">
-                    <h2 className="text-xl font-bold text-gray-800">Carrito de Venta</h2>
+                    <h2 className="text-xl font-bold text-gray-800">Caja</h2>
                   </div>
-
                   <div className="flex-1 overflow-y-auto p-4">
                     {cart.length === 0 ? (
                       <div className="flex items-center justify-center h-full text-gray-400">
@@ -852,16 +860,20 @@ const POSSystem = () => {
                             <div className="flex items-center gap-1">
                               <button
                                 onClick={() => updateCartQuantity(item.id, -1)}
-                                className="p-1 bg-gray-600 text-white rounded hover:bg-gray-800"
+                                className="p-1 text-[#696969] 
+                                hover:scale-110
+                                active:scale-95"
                               >
-                                <Minus size={14} />
+                                <Minus size={18} />
                               </button>
                               <span className="w-8 text-center text-sm font-semibold">{item.cantidadVendida}</span>
                               <button
                                 onClick={() => updateCartQuantity(item.id, 1)}
-                                className="p-1 bg-gray-600 text-white rounded hover:bg-gray-800"
+                                className="p-1 text-[#696969] 
+                                hover:scale-110
+                                active:scale-95"
                               >
-                                <Plus size={14} />
+                                <Plus size={18} />
                               </button>
                             </div>
                             <div className="w-20 text-right">
@@ -871,7 +883,7 @@ const POSSystem = () => {
                             </div>
                             <button
                               onClick={() => removeFromCart(item.id)}
-                              className="p-1 text-red-500 hover:bg-red-50 rounded"
+                              className="p-2 text-[#bb1c49] hover:bg-red-50 rounded"
                             >
                               <Trash2 size={16} />
                             </button>
@@ -883,9 +895,10 @@ const POSSystem = () => {
 
                   {/* Total y Pago - Ahora siempre visible */}
                   <div className="p-4 space-y-3">
-                    <div className="flex justify-between items-center text-2xl font-bold">
-                      <span>Total a cobrar:</span>
-                      <span className="text-[#004b6b]">${calculateTotal().toFixed(2)}</span>
+                    <div className="h-px bg-gray-800 mx-auto"></div>
+                    <div className="flex justify-between items-center text-2xl font-semibold">
+                      <span>Total:</span>
+                      <span className="text-[#2b2929]">${calculateTotal().toFixed(2)}</span>
                     </div>
 
                     {/* Dinero Recibido y Vuelto */}
@@ -895,7 +908,7 @@ const POSSystem = () => {
                           Recibe:
                         </label>
                         <div className="relative">
-                          <DollarSign className="absolute left-3 top-3 text-gray-400" size={20} />
+                          <CircleDollarSign className="absolute left-3 top-3 text-gray-400" size={20} />
                           <input
                             type="number"
                             step="0.01"
@@ -931,12 +944,12 @@ const POSSystem = () => {
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 gap-2 ">
+                    <div className="grid grid-cols-1 gap-2">
                       <button
                         onClick={processSale}
                         disabled={cart.length === 0 || processingSale}
-                        className={`px-4 py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2 ${cart.length === 0
-                          || processingSale
+                        className={`px-4 py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2 
+                          ${cart.length === 0 || processingSale
                           ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                           : 'bg-[#008cc8] text-white hover:bg-[#007baf]'
                           }`}
@@ -947,7 +960,7 @@ const POSSystem = () => {
                           </>
                         ) : (
                           <>
-                            Procesar Venta
+                            Pagar
                           </>
                         )}
                       </button>
@@ -985,7 +998,7 @@ const POSSystem = () => {
                           Costo <span className="text-red-500">*</span>
                         </label>
                         <div className="relative">
-                          <DollarSign className="absolute left-3 top-3 text-gray-400" size={20} />
+                          <CircleDollarSign className="absolute left-3 top-3 text-gray-400" size={20} />
                           <input
                             type="number"
                             step="0.01"
@@ -1367,7 +1380,7 @@ const POSSystem = () => {
                               ${profitAnalysis.utilidad_neta.toFixed(2)}
                             </p>
                           </div>
-                          <DollarSign className="text-green-500" size={32} />
+                          <CircleDollarSign className="text-green-500" size={32} />
                         </div>
                       </div>
 
