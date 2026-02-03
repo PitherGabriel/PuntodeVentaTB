@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, session
 from flask_cors import CORS
-from pos_backend import InventoryManager
+from pos_backend import InventoryManager, ReceiptPrinter
 import secrets
 
 app = Flask(__name__)
@@ -176,10 +176,11 @@ def process_sale():
     """Procesar una venta"""
     try:
         cart = request.json.get('cart', [])
-        print(cart)
+        #print(cart)
         vendedor = request.json.get('vendedor', 'Sistema')
 
-        result = inventory.process_sale(cart, vendedor)
+        result =  inventory.process_sale(cart, vendedor)
+
         return jsonify(result)
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -232,7 +233,7 @@ def get_profit_analysis():
             'success': False,
             'message': str(e)
         }), 500
-    
+
 """
 @app.route('/api/sale-with-invoice-sri', methods=['POST'])
 def process_sale_with_invoice_sri():

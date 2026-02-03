@@ -1,8 +1,107 @@
+from concurrent.futures import ThreadPoolExecutor
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from datetime import datetime
 import hashlib
+from datetime import datetime
 import uuid
+
+# Printer
+from escpos.printer import Network
+
+
+class ReceiptPrinter: 
+    def __init__(self):
+        # Configure for RPT004 - adjust vendor/product ID for your printer
+        # To find IDs: lsusb (Linux) or Device Manager (Windows)
+        try:
+            # USB Printer
+            #self.printer = Usb(0x0416, 0x5011)  # Replace with your RPT004 IDs
+            
+            # OR Network Printer (if using WiFi/Ethernet)
+            self.printer = Network("192.168.1.100")
+            
+            # OR File Printer (for testing - prints to file)
+            # self.printer = File("/dev/usb/lp0")
+            
+        except Exception as e:
+            print(f"Printer initialization error: {e}")
+            self.printer = None
+    
+    def print_receipt(self, receipt_data):
+        """Print receipt to thermal printer"""
+        if not self.printer:
+            return {'success': False, 'error': 'Printer not initialized'}
+        
+        try:
+            business = receipt_data['business']
+            sale = receipt_data['sale']
+            items = receipt_data['items']
+            totals = receipt_data['totals']
+            
+            # Set encoding
+            self.printer.charcode('USA')
+            
+            # Header - Centered
+            self.printer.set(align='center', text_type='B', width=2, height=2)
+            self.printer.text(f"{business['name']}\n")
+            
+            self.printer.set(align='center', text_type='normal', width=1, height=1)
+            self.printer.text(f"{business['address']}\n")
+            self.printer.text(f"{business['RUC']}\n")
+
+            # Separator
+            self.printer.text("================================\n")
+            
+            # Sale Info - Left aligned
+            self.printer.set(align='left')
+            self.printer.text(f"Fecha: {sale['fecha']} {sale['hora']}\n")          
+            self.printer.text("--------------------------------\n")
+            
+            # Items Header
+            self.printer.set(text_type='B')
+            self.printer.text(f"{'Producto':<20} {'Cant':>4} {'Total':>8}\n")
+            self.printer.set(text_type='normal')
+            self.printer.text("--------------------------------\n")
+            
+            # Items
+            for item in items:
+                # Product name (can wrap if long)
+                name = item['product_name'][:20]
+                self.printer.text(f"{name:<20}\n")
+                
+                # Quantity, price, total
+                qty = item['quantity_sold']
+                price = item['price']
+                total = price * qty
+                self.printer.text(f"  ${price:.2f} x {qty:>2}        ${total:>7.2f}\n")
+            
+            self.printer.text("================================\n")
+            
+            # Totals
+            self.printer.set(text_type='B', width=2, height=2)
+            self.printer.text(f"TOTAL:          ${totals['total']:>8.2f}\n")
+            
+            #self.printer.set(text_type='normal', width=1, height=1)
+            #if totals['received'] > 0:
+            #    self.printer.text(f"Recibido:       ${totals['received']:>8.2f}\n")
+            #    self.printer.text(f"Cambio:         ${totals['change']:>8.2f}\n")
+            
+            self.printer.text("--------------------------------\n")
+            
+            # Footer - Centered
+            self.printer.set(align='center')
+            self.printer.text("\n")
+            self.printer.set(text_type='B')
+            self.printer.text("¡Gracias por su compra!\n")
+            self.printer.text("\n")
+            
+            # Cut paper
+            self.printer.cut()
+            
+            return {'success': True, 'message': 'Receipt printed successfully'}
+            
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
 
 class InventoryManager:
     def __init__(self, credentials_file, spreadsheet_name):
@@ -17,6 +116,7 @@ class InventoryManager:
         self.sheet_inventory = self.spreadsheet.worksheet('Inventario')
         self.sheet_sales = self.spreadsheet.worksheet('Ventas')
         self.sheet_users = self.spreadsheet.worksheet('Usuarios')  # Nueva hoja
+        self.printer = ReceiptPrinter()
     
     def hash_password(self, password):
         """Hash de contraseña con SHA256"""
@@ -330,8 +430,50 @@ class InventoryManager:
                 })
 
         print(f"Sales details: {sale_details}")
-            
-        save_result = self.save_sale(sale_id, sale_details, total_sale, vendedor)
+        
+        # Prepare receipt data
+        receipt_data = {
+            'business': {
+                'name': 'COMERCIAL TB',
+                'address': 'Loja-San Lucas Av. Panamericana ',
+                'RUC': 'RUC: 1102762885001'
+            },
+            'sale': {
+                'id': sale_id,
+                'fecha': datetime.now().strftime('%d/%m/%Y'),
+                'hora': datetime.now().strftime('%H:%M:%S'),
+                'vendedor': vendedor
+            },
+            'items': cart_items,
+            'totals': {
+                'total': total_sale,
+            }
+        }
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            # Submit both tasks receipt
+            #print_future = executor.submit(
+            #    self.printer.print_receipt, 
+            #    receipt_data
+            #)
+            save_future = executor.submit(
+                self.save_sale, 
+                sale_id, 
+                sale_details, 
+                total_sale, 
+                vendedor
+                )
+
+            # Wait for BOTH to complete and get results
+            #print_result = print_future.result()  # Blocks until print is done
+            save_result = save_future.result()    # Blocks until save is done
+        
+        # Both tasks are now complete - check results
+        #if not print_result['success']:
+        #    return {
+        #        'success': False,
+        #        'message': f"Error imprimiendo recibo: {print_result.get('error')}"
+        #    }
 
         if not save_result['success']:
             return {
@@ -566,7 +708,6 @@ class InventoryManager:
                 'error': str(e),
                 'traceback': traceback.format_exc()
             }
-
 
 # Ejemplo de uso
 if __name__ == "__main__":
