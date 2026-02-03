@@ -1,6 +1,7 @@
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
+import hashlib
 import uuid
 
 class InventoryManager:
@@ -15,11 +16,165 @@ class InventoryManager:
         self.spreadsheet = self.client.open(spreadsheet_name)
         self.sheet_inventory = self.spreadsheet.worksheet('Inventario')
         self.sheet_sales = self.spreadsheet.worksheet('Ventas')
-        
+        self.sheet_users = self.spreadsheet.worksheet('Usuarios')  # Nueva hoja
+    
+    def hash_password(self, password):
+        """Hash de contraseña con SHA256"""
+        return hashlib.sha256(password.encode()).hexdigest()
+    
+    def create_user(self, username, password, role='vendedor', nombre=''):
+        """Crea un nuevo usuario"""
+        try:
+            # Verificar si el usuario ya existe
+            users = self.sheet_users.get_all_records()
+            for user in users:
+                if user['Usuario'].lower() == username.lower():
+                    return {
+                        'success': False,
+                        'message': 'El usuario ya existe'
+                    }
+            
+            # Hash de la contraseña
+            hashed_password = self.hash_password(password)
+            
+            # Obtener siguiente ID
+            next_id = len(users) + 1
+            
+            # Crear usuario
+            row = [
+                next_id,
+                username,
+                hashed_password,
+                role,  # admin, vendedor, cajero
+                nombre,
+                'Si',  # Activo
+                ''  # UltimoAcceso
+            ]
+            
+            self.sheet_users.append_row(row)
+            
+            return {
+                'success': True,
+                'message': 'Usuario creado exitosamente',
+                'user_id': next_id
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def authenticate_user(self, username, password):
+        """Autentica un usuario"""
+        try:
+            users = self.sheet_users.get_all_records()
+            hashed_password = self.hash_password(password)
+            
+            for user in users:
+                if (user['Usuario'].lower() == username.lower() and 
+                    user['Password'] == hashed_password and 
+                    user['Activo'].lower() == 'si'):
+                    
+                    # Actualizar último acceso
+                    user_row = users.index(user) + 2  # +2 porque fila 1 es header y index empieza en 0
+                    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    self.sheet_users.update_cell(user_row, 7, now)  # Columna 7 es UltimoAcceso
+                    
+                    return {
+                        'success': True,
+                        'user': {
+                            'id': user['ID'],
+                            'username': user['Usuario'],
+                            'role': user['Rol'],
+                            'nombre': user['Nombre']
+                        }
+                    }
+            
+            return {
+                'success': False,
+                'message': 'Usuario o contraseña incorrectos'
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def get_all_users(self):
+        """Obtiene todos los usuarios (sin passwords)"""
+        try:
+            users = self.sheet_users.get_all_records()
+            users_list = []
+            
+            for user in users:
+                users_list.append({
+                    'id': user['ID'],
+                    'username': user['Usuario'],
+                    'role': user['Rol'],
+                    'nombre': user['Nombre'],
+                    'activo': user['Activo'],
+                    'ultimo_acceso': user.get('UltimoAcceso', '')
+                })
+            
+            return {
+                'success': True,
+                'users': users_list
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
     def get_inventory(self):
         """Obtiene todo el inventario"""
         records = self.sheet_inventory.get_all_records()
         return records
+    
+    def add_product(self, product_data):
+        """Agrega un nuevo producto a la hoja de Inventario"""
+        try:
+            now = datetime.now()
+            ultima_actualizacion = now.strftime('%Y-%m-%d %H:%M:%S')
+            
+            # Obtener el último ID para generar el siguiente
+            all_records = self.sheet_inventory.get_all_records()
+            next_id = len(all_records) + 1  # El siguiente ID es el total de registros + 1
+            
+            # Preparar fila para insertar
+            # Estructura: ID, Codigo, Nombre, Cantidad, Costo, Precio, MinStock, UltimaActualizacion
+            row = [
+                next_id,
+                product_data['codigo'],
+                product_data['nombre'],
+                product_data['cantidad'],
+                product_data['costo'],
+                product_data['precio'],
+                product_data['minStock'],
+                ultima_actualizacion
+            ]
+            
+            print(f'Producto para insertar: {row}')
+            
+            # Insertar el producto
+            self.sheet_inventory.append_row(row)
+            
+            return {
+                'success': True,
+                'message': 'Producto agregado exitosamente',
+                'product_code': product_data['codigo'],
+                'product_id': next_id
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'message': f'Error al agregar producto: {str(e)}'
+            }
     
     def get_product_by_code(self, code):
         """Busca un producto por código"""
@@ -48,8 +203,8 @@ class InventoryManager:
             product_id = self.sheet_inventory.cell(row, 1).value
             product_name = self.sheet_inventory.cell(row, 3).value
             current_qty = int(self.sheet_inventory.cell(row, 4).value)
-            price = float(self.sheet_inventory.cell(row, 5).value)
-            min_stock = int(self.sheet_inventory.cell(row, 6).value)
+            price = float(self.sheet_inventory.cell(row, 6).value)
+            min_stock = int(self.sheet_inventory.cell(row, 7).value)
             
             # Verificar si hay suficiente stock
             if current_qty < quantity_sold:
@@ -66,7 +221,7 @@ class InventoryManager:
             
             # Actualizar timestamp
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            self.sheet_inventory.update_cell(row, 7, timestamp)
+            self.sheet_inventory.update_cell(row, 8, timestamp)
             
             # Verificar si requiere alerta
             alert = new_qty <= min_stock
@@ -127,7 +282,6 @@ class InventoryManager:
                 'success': False,
                 'error': str(e)
             }
-
         
     def process_sale(self, cart_items, vendedor='Sistema'):
         """Procesa una venta completa"""
@@ -265,6 +419,153 @@ class InventoryManager:
                 })
         
         return alerts
+
+    def get_profit_analysis(self, period='today', custom_start=None, custom_end=None):
+        """Analiza las utilidades para cierre de caja por período"""
+        try:
+            from datetime import datetime, timedelta
+            
+            # Obtener ventas e inventario
+            sales = self.sheet_sales.get_all_records()
+            inventory = self.sheet_inventory.get_all_records()
+            
+            # Diccionario de costos
+            costs_dict = {item['Codigo']: float(item.get('Costo', 0)) for item in inventory}
+            
+            # Determinar rango de fechas según período
+            now = datetime.now()
+            
+            if period == 'today':
+                start_date = now.replace(hour=0, minute=0, second=0)
+                end_date = now.replace(hour=23, minute=59, second=59)
+                period_label = f"Hoy - {now.strftime('%d/%m/%Y')}"
+                
+            elif period == 'week':
+                # Inicio de semana (lunes)
+                start_date = now - timedelta(days=now.weekday())
+                start_date = start_date.replace(hour=0, minute=0, second=0)
+                end_date = now.replace(hour=23, minute=59, second=59)
+                period_label = f"Esta Semana ({start_date.strftime('%d/%m')} - {end_date.strftime('%d/%m/%Y')})"
+                
+            elif period == 'month':
+                # Inicio de mes
+                start_date = now.replace(day=1, hour=0, minute=0, second=0)
+                end_date = now.replace(hour=23, minute=59, second=59)
+                period_label = f"Este Mes - {now.strftime('%B %Y')}"
+                
+            elif period == 'custom' and custom_start and custom_end:
+                start_date = datetime.strptime(custom_start, '%Y-%m-%d')
+                end_date = datetime.strptime(custom_end, '%Y-%m-%d')
+                end_date = end_date.replace(hour=23, minute=59, second=59)
+                period_label = f"{start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}"
+            else:
+                return {'success': False, 'error': 'Período no válido'}
+            
+            # Filtrar ventas por período
+            filtered_sales = []
+            for sale in sales:
+                try:
+                    sale_datetime = datetime.strptime(f"{sale['Fecha']} {sale['Hora']}", '%Y-%m-%d %H:%M:%S')
+                    if start_date <= sale_datetime <= end_date:
+                        filtered_sales.append(sale)
+                except:
+                    continue
+            
+            # Calcular totales
+            total_ingresos = 0
+            total_costos = 0
+            total_unidades = 0
+            ventas_detalle = []
+            productos_vendidos = {}
+            vendedores_stats = {}
+            
+            for sale in filtered_sales:
+                codigo = sale['Codigo']
+                cantidad = int(sale['Cantidad'])
+                precio_venta = float(sale['PrecioUnitario'])
+                costo_unitario = costs_dict.get(codigo, 0)
+                vendedor = sale.get('Vendedor', 'Sistema')
+                
+                ingreso = precio_venta * cantidad
+                costo = costo_unitario * cantidad
+                utilidad = ingreso - costo
+                
+                total_ingresos += ingreso
+                total_costos += costo
+                total_unidades += cantidad
+                
+                # Detalle de venta
+                ventas_detalle.append({
+                    'fecha': sale['Fecha'],
+                    'hora': sale['Hora'],
+                    'producto': sale['Nombre'],
+                    'cantidad': cantidad,
+                    'precio_venta': precio_venta,
+                    'costo_unitario': costo_unitario,
+                    'ingreso': ingreso,
+                    'costo': costo,
+                    'utilidad': utilidad,
+                    'vendedor': vendedor
+                })
+                
+                # Agrupar por producto
+                if codigo not in productos_vendidos:
+                    productos_vendidos[codigo] = {
+                        'producto': sale['Nombre'],
+                        'codigo': codigo,
+                        'cantidad': 0,
+                        'ingresos': 0,
+                        'costos': 0,
+                        'utilidad': 0
+                    }
+                productos_vendidos[codigo]['cantidad'] += cantidad
+                productos_vendidos[codigo]['ingresos'] += ingreso
+                productos_vendidos[codigo]['costos'] += costo
+                productos_vendidos[codigo]['utilidad'] += utilidad
+                
+                # Estadísticas por vendedor
+                if vendedor not in vendedores_stats:
+                    vendedores_stats[vendedor] = {
+                        'vendedor': vendedor,
+                        'ventas': 0,
+                        'ingresos': 0,
+                        'utilidad': 0
+                    }
+                vendedores_stats[vendedor]['ventas'] += 1
+                vendedores_stats[vendedor]['ingresos'] += ingreso
+                vendedores_stats[vendedor]['utilidad'] += utilidad
+            
+            utilidad_neta = total_ingresos - total_costos
+            margen_total = (utilidad_neta / total_ingresos * 100) if total_ingresos > 0 else 0
+            
+            # Convertir diccionarios a listas y ordenar
+            productos_list = sorted(productos_vendidos.values(), key=lambda x: x['utilidad'], reverse=True)
+            vendedores_list = sorted(vendedores_stats.values(), key=lambda x: x['ingresos'], reverse=True)
+            
+            return {
+                'success': True,
+                'data': {
+                    'periodo': period_label,
+                    'total_ingresos': round(total_ingresos, 2),
+                    'total_costos': round(total_costos, 2),
+                    'utilidad_neta': round(utilidad_neta, 2),
+                    'margen_total': round(margen_total, 2),
+                    'total_ventas': len(filtered_sales),
+                    'total_unidades': total_unidades,
+                    'ticket_promedio': round(total_ingresos / len(filtered_sales), 2) if filtered_sales else 0,
+                    'productos_vendidos': productos_list[:10],  # Top 10
+                    'vendedores': vendedores_list,
+                    'ventas_detalle': ventas_detalle
+                }
+            }
+            
+        except Exception as e:
+            import traceback
+            return {
+                'success': False,
+                'error': str(e),
+                'traceback': traceback.format_exc()
+            }
 
 
 # Ejemplo de uso
