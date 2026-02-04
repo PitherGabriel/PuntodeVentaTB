@@ -616,9 +616,9 @@ class InventoryManager:
                     continue
             
             # Calcular totales
-            total_ingresos = 0
-            total_costos = 0
-            total_unidades = 0
+            total_ingresos = Decimal("0.000")
+            total_costos = Decimal("0.000")
+            total_unidades = Decimal("0")
             ventas_detalle = []
             productos_vendidos = {}
             vendedores_stats = {}
@@ -630,9 +630,9 @@ class InventoryManager:
                 costo_unitario = Decimal(str(costs_dict.get(codigo, 0)))
                 vendedor = sale.get('Vendedor', 'Sistema')
                 
-                ingreso = precio_venta * cantidad
-                costo = costo_unitario * cantidad
-                utilidad = ingreso - costo
+                ingreso = (precio_venta * cantidad).quantize(Decimal("0.001"), ROUND_HALF_UP)
+                costo = (costo_unitario * cantidad).quantize(Decimal("0.001"), ROUND_HALF_UP)
+                utilidad = (ingreso - costo).quantize(Decimal("0.001"), ROUND_HALF_UP)
                 
                 utilidad = utilidad.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
@@ -682,8 +682,8 @@ class InventoryManager:
                 vendedores_stats[vendedor]['ingresos'] += ingreso
                 vendedores_stats[vendedor]['utilidad'] += utilidad
             
-            utilidad_neta = total_ingresos - total_costos
-            margen_total = (utilidad_neta / total_ingresos * 100) if total_ingresos > 0 else 0
+            utilidad_neta = (total_ingresos - total_costos).quantize(Decimal("0.001"), ROUND_HALF_UP)
+            margen_total = ((utilidad_neta / total_ingresos * 100)).quantize(Decimal("0.001"), ROUND_HALF_UP)if total_ingresos > 0 else Decimal("0.000")
             
             # Convertir diccionarios a listas y ordenar
             productos_list = sorted(productos_vendidos.values(), key=lambda x: x['utilidad'], reverse=True)
