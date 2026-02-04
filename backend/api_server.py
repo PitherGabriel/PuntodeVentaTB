@@ -6,6 +6,27 @@ import os
 
 def create_app():
     app = Flask(__name__)
+    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
+
+    app.config.update(
+        SESSION_COOKIE_NAME='pos_session',
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE='Lax',
+        SESSION_COOKIE_SECURE=False,   # change to True when HTTPS
+        SESSION_PERMANENT=True,
+        PERMANENT_SESSION_LIFETIME=60 * 60 * 24 * 7,  # 7 days
+        SESSION_REFRESH_EACH_REQUEST=True
+    )
+
+    app.config.update(
+        SESSION_COOKIE_NAME='pos_session',
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE='Lax',
+        SESSION_COOKIE_SECURE=False,  # change to True when HTTPS
+        SESSION_PERMANENT=True,
+        PERMANENT_SESSION_LIFETIME=60 * 60 * 24 * 7,
+        SESSION_REFRESH_EACH_REQUEST=True
+    )
     app.secret_key = secrets.token_hex(16)  # Clave secreta para sesiones
     CORS(app, supports_credentials=True)  # Importante: soportar credenciales
 
