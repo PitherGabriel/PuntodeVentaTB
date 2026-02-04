@@ -1409,7 +1409,7 @@ const POSSystem = () => {
                       </div>
                       <div className="bg-white p-4 rounded-lg shadow">
                         <p className="text-gray-500 text-sm">Ticket Promedio</p>
-                        <p className="text-xl font-bold text-gray-800">${profitAnalysis.ticket_promedio.toFixed(2)}</p>
+                        <p className="text-xl font-bold text-gray-800">${profitAnalysis.ticket_promedio}</p>
                       </div>
                     </div>
 
