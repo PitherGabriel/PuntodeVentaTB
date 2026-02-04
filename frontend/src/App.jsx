@@ -1389,7 +1389,7 @@ const POSSystem = () => {
                           <div>
                             <p className="text-gray-500 text-sm font-medium">Margen</p>
                             <p className="text-2xl font-bold text-purple-600 mt-1">
-                              {profitAnalysis.margen_total.toFixed(1)}%
+                              {profitAnalysis.margen_total}%
                             </p>
                           </div>
                           <TrendingUp className="text-purple-500" size={32} />
