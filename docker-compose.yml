@@ -23,6 +23,7 @@ services:
     environment:
       - FLASK_ENV=production
       - GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/credentials.json
+      - SECRET_KEY=6fcaf257e19623b92d75f55c40875c02df68d199f022ece30041025982e66664
     volumes:
       - ./secrets/credentials.json:/run/secrets/credentials.json:ro
     networks:
