@@ -1236,9 +1236,9 @@ const POSSystem = () => {
                             </td>
                             <td className="px-6 py-4 text-sm text-gray-800">{sale.Nombre}</td>
                             <td className="px-6 py-4 text-sm text-gray-600">{sale.Cantidad}</td>
-                            <td className="px-6 py-4 text-sm text-gray-600">${sale.PrecioUnitario.toFixed(2)}</td>
-                            <td className="px-6 py-4 text-sm font-semibold text-gray-800">${sale.Subtotal.toFixed(2)}</td>
-                            <td className="px-6 py-4 text-sm font-semibold text-gray-800">${sale.TotalVenta.toFixed(2)}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">${sale.PrecioUnitario}</td>
+                            <td className="px-6 py-4 text-sm font-semibold text-gray-800">${sale.Subtotal}</td>
+                            <td className="px-6 py-4 text-sm font-semibold text-gray-800">${sale.TotalVenta}</td>
                             <td className="px-6 py-4 text-sm text-gray-600">{sale.Vendedor}</td>
                           </tr>
                         ))}
@@ -1353,7 +1353,7 @@ const POSSystem = () => {
                           <div>
                             <p className="text-gray-500 text-sm font-medium">Ingresos</p>
                             <p className="text-2xl font-bold text-blue-600 mt-1">
-                              ${profitAnalysis.total_ingresos.toFixed(2)}
+                              ${profitAnalysis.total_ingresos}
                             </p>
                           </div>
                           <TrendingUp className="text-blue-500" size={32} />
@@ -1365,7 +1365,7 @@ const POSSystem = () => {
                           <div>
                             <p className="text-gray-500 text-sm font-medium">Costos</p>
                             <p className="text-2xl font-bold text-red-600 mt-1">
-                              ${profitAnalysis.total_costos.toFixed(2)}
+                              ${profitAnalysis.total_costos}
                             </p>
                           </div>
                           <Minus className="text-red-500" size={32} />
@@ -1377,7 +1377,7 @@ const POSSystem = () => {
                           <div>
                             <p className="text-gray-500 text-sm font-medium">Utilidad Neta</p>
                             <p className="text-2xl font-bold text-green-600 mt-1">
-                              ${profitAnalysis.utilidad_neta.toFixed(2)}
+                              ${profitAnalysis.utilidad_neta}
                             </p>
                           </div>
                           <CircleDollarSign className="text-green-500" size={32} />
@@ -1436,13 +1436,13 @@ const POSSystem = () => {
                                   <td className="px-4 py-3 text-sm text-gray-800">{producto.producto}</td>
                                   <td className="px-4 py-3 text-sm text-right text-gray-600">{producto.cantidad}</td>
                                   <td className="px-4 py-3 text-sm text-right text-blue-600">
-                                    ${producto.ingresos.toFixed(2)}
+                                    ${producto.ingresos}
                                   </td>
                                   <td className="px-4 py-3 text-sm text-right text-red-600">
-                                    ${producto.costos.toFixed(2)}
+                                    ${producto.costos}
                                   </td>
                                   <td className="px-4 py-3 text-sm text-right font-semibold text-green-600">
-                                    ${producto.utilidad.toFixed(2)}
+                                    ${producto.utilidad}
                                   </td>
                                 </tr>
                               ))}
@@ -1474,10 +1474,10 @@ const POSSystem = () => {
                                   <td className="px-4 py-3 text-sm text-gray-800 font-medium">{vendedor.vendedor}</td>
                                   <td className="px-4 py-3 text-sm text-right text-gray-600">{vendedor.ventas}</td>
                                   <td className="px-4 py-3 text-sm text-right text-blue-600">
-                                    ${vendedor.ingresos.toFixed(2)}
+                                    ${vendedor.ingresos}
                                   </td>
                                   <td className="px-4 py-3 text-sm text-right font-semibold text-green-600">
-                                    ${vendedor.utilidad.toFixed(2)}
+                                    ${vendedor.utilidad}
                                   </td>
                                 </tr>
                               ))}
