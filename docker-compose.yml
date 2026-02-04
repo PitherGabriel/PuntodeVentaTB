@@ -23,7 +23,7 @@ services:
     environment:
       - FLASK_ENV=production
       - GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/credentials.json
-    volumens:
+    volumes:
       - ./secrets/credentials.json:/run/secrets/credentials.json:ro
     networks:
       - pos-network
