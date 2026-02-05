@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, forwardRef } from 'react';
 import {
   ShoppingCart,
   Package,
@@ -195,11 +195,14 @@ const POSSystem = () => {
           id: item.ID,
           nombre: item.Nombre,
           cantidad: item.Cantidad,
-          precio: parseFloat(item.Precio),
+          unidad: item.Unidad,
+          precio: parseFloat(item.Precio_1),
+          precio_2: parseFloat(item.Precio_2),
           costo: parseFloat(item.Costo || 0),
           minStock: item.MinStock,
           codigo: item.Codigo
         }));
+        console.log(formattedInventory)
         setInventory(formattedInventory);
       }
       setIsLoading(false);
@@ -270,14 +273,19 @@ const POSSystem = () => {
     try {
       const codigo = generateProductCode(newProduct.nombre);
       const precioVenta = calculateSalePrice(newProduct.costo, newProduct.porcentajeGanancia);
+      const precioVenta2 = newProduct.hasPrecio2 && newProduct.porcentajeGanancia2
+        ? calculateSalePrice(newProduct.costo, newProduct.porcentajeGanancia2)
+        : null;
 
       const productData = {
         codigo: codigo,
         nombre: newProduct.nombre,
         cantidad: parseInt(newProduct.cantidad) || 0,
         costo: parseFloat(newProduct.costo),
-        precio: parseFloat(precioVenta),
-        minStock: parseInt(newProduct.minStock) || 5
+        precio_1: parseFloat(precioVenta),
+        precio_2: precioVenta2 ? parseFloat(precioVenta2) : null,
+        minStock: parseInt(newProduct.minStock) || 5,
+        unidad: newProduct.unidad || 'unidad'
       };
 
       const response = await fetch(`${API_URL}/inventory/add`, {
@@ -297,7 +305,9 @@ const POSSystem = () => {
           costo: '',
           porcentajeGanancia: '',
           cantidad: '',
-          minStock: ''
+          minStock: '',
+          unidad: 'unidad',
+          hasPrecio2: false
         });
         loadInventory();
       } else {
@@ -312,6 +322,7 @@ const POSSystem = () => {
   // Agregar producto al carrito
   const addToCart = (product) => {
     const existingItem = cart.find(item => item.id === product.id);
+    console.log(product.unidad)
 
     if (product.cantidad === 0) {
       alert('¡Producto sin stock!');
@@ -329,8 +340,37 @@ const POSSystem = () => {
           : item
       ));
     } else {
-      setCart([...cart, { ...product, cantidadVendida: 1 }]);
+      setCart([...cart,
+      {
+        ...product,
+        cantidadVendida: product.unidad == 'unidad' ? 1 : 0.01,
+        priceType: 'precio',
+        precioActual: product.precio
+      }]);
     }
+  };
+
+  // Cambiar tipo de precio en el carrito
+  const changePriceType = (productId, newPriceType) => {
+    setCart(cart.map(item => {
+      if (item.id === productId) {
+        return {
+          ...item,
+          priceType: newPriceType,
+          precioActual: item[newPriceType] // Update to the new price from the product data
+        };
+      }
+      return item;
+    }));
+  };
+
+  // Actualizar precio manualmente
+  const updateCartPrice = (productId, newPrice) => {
+    setCart(cart.map(item =>
+      item.id === productId
+        ? { ...item, precioActual: parseFloat(newPrice) || 0 }
+        : item
+    ));
   };
 
   // Actualizar cantidad de productos en carrito
@@ -350,9 +390,61 @@ const POSSystem = () => {
       return;
     }
 
+
     setCart(cart.map(item =>
       item.id === productId
         ? { ...item, cantidadVendida: newQuantity }
+        : item
+    ));
+  };
+
+  // Updated function to handle empty inputs gracefully
+  const setCartQuantity = (productId, newQuantity) => {
+    const product = inventory.find(p => p.id === productId);
+
+    // Allow empty input (user is typing) - set to 0 temporarily
+    if (newQuantity === '' || newQuantity === null || newQuantity === undefined) {
+      setCart(cart.map(item =>
+        item.id === productId
+          ? { ...item, cantidadVendida: 0 }
+          : item
+      ));
+      return;
+    }
+
+    const quantity = parseFloat(newQuantity);
+
+    // If NaN, set to 0
+    if (isNaN(quantity)) {
+      setCart(cart.map(item =>
+        item.id === productId
+          ? { ...item, cantidadVendida: 0 }
+          : item
+      ));
+      return;
+    }
+
+    // Only remove if user explicitly sets negative (optional - you can remove this check)
+    if (quantity < 0) {
+      return; // Don't allow negative
+    }
+
+    // Check stock
+    if (quantity > product.cantidad) {
+      alert('¡No hay suficiente stock!');
+      // Set to max available instead of blocking
+      setCart(cart.map(item =>
+        item.id === productId
+          ? { ...item, cantidadVendida: product.cantidad }
+          : item
+      ));
+      return;
+    }
+
+    // Update normally
+    setCart(cart.map(item =>
+      item.id === productId
+        ? { ...item, cantidadVendida: quantity }
         : item
     ));
   };
@@ -482,7 +574,8 @@ const POSSystem = () => {
         codigo: item.codigo,
         cantidad_vendida: item.cantidadVendida,
         nombre: item.nombre,
-        precio: item.precio
+        precio: item.precio,
+        tipoPrecio: item.priceType
       }));
 
       const response = await fetch(`${API_URL}/sale`, {
@@ -524,10 +617,13 @@ const POSSystem = () => {
     }
   };
 
-  const calculateTotal = () => {
-    return cart.reduce((sum, item) => sum + (item.precio * item.cantidadVendida), 0);
-  };
-
+const calculateTotal = () => {
+  return cart.reduce(
+    (sum, item) =>
+      sum + (item.precioActual ?? item.precio) * item.cantidadVendida,
+    0
+  )
+}
   const calculateChange = () => {
     const total = calculateTotal();
     const received = parseFloat(receivedMoney) || 0;
@@ -827,7 +923,7 @@ const POSSystem = () => {
                             </p>
                             <p className={`text-xs mt-1 ${product.cantidad === 0 ? 'text-red-600' : 'text-gray-600'
                               }`}>
-                              Stock: {product.cantidad}
+                              Stock: {product.cantidad} {product.unidad}
                             </p>
                           </div>
                         ))}
@@ -851,44 +947,99 @@ const POSSystem = () => {
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {cart.map(item => (
-                          <div key={item.id} className="flex items-center gap-2 bg-gray-100 p-2 rounded-lg">
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-semibold text-sm text-gray-800 truncate">{item.nombre}</h3>
-                              <p className="text-xs text-gray-500">${item.precio.toFixed(2)} c/u</p>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => updateCartQuantity(item.id, -1)}
-                                className="p-1 text-[#696969] 
-                                hover:scale-110
-                                active:scale-95"
-                              >
-                                <Minus size={18} />
-                              </button>
-                              <span className="w-8 text-center text-sm font-semibold">{item.cantidadVendida}</span>
-                              <button
-                                onClick={() => updateCartQuantity(item.id, 1)}
-                                className="p-1 text-[#696969] 
-                                hover:scale-110
-                                active:scale-95"
-                              >
-                                <Plus size={18} />
-                              </button>
-                            </div>
-                            <div className="w-20 text-right">
-                              <p className="text-sm font-bold text-gray-800">
-                                ${(item.precio * item.cantidadVendida).toFixed(2)}
-                              </p>
-                            </div>
-                            <button
-                              onClick={() => removeFromCart(item.id)}
-                              className="p-2 text-[#bb1c49] hover:bg-red-50 rounded"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                        {/* Header row */}
+                        <div className="grid grid-cols-12 gap-2 bg-gray-100 px-3 py-2 rounded-lg">
+                          <div className="col-span-4">
+                            <span className="text-xs font-medium text-gray-500 uppercase">Producto</span>
                           </div>
-                        ))}
+                          <div className="col-span-3 text-center">
+                            <span className="text-xs font-medium text-gray-500 uppercase">Cantidad</span>
+                          </div>
+                          <div className="col-span-3 text-center">
+                            <span className="text-xs font-medium text-gray-500 uppercase">Precio</span>
+                          </div>
+                          <div className="col-span-2 text-right">
+                            <span className="text-xs font-medium text-gray-500 uppercase">Subtotal</span>
+                          </div>
+                        </div>
+
+                        {/* Cart items */}
+                        {cart.map(item => {
+                          const hasTwoPrices = item.precio_2 !== undefined && item.precio_2 !== null && item.precio_2 > 0;
+                          return (
+                            <div key={item.id} className="bg-gray-100 p-3 rounded-lg">
+                              <div className="grid grid-cols-12 gap-2 items-center">
+                                {/* Product Name - 4 columns */}
+                                <div className="col-span-4 min-w-0">
+                                  <h3 className="font-semibold text-sm text-gray-800 truncate">{item.nombre}</h3>
+                                </div>
+
+                                {/* Quantity - 3 columns */}
+                                <div className="col-span-3 flex items-center justify-center gap-1">
+                                  <input
+                                    type='number'
+                                    value={item.cantidadVendida || ''}
+                                    placeholder="0"
+                                    step={item.unidad === 'unidad' ? "1" : '0.01'}
+                                    min='0'
+                                    onChange={(e) => setCartQuantity(item.id, e.target.value)}
+                                    onWheel={(e) => e.target.blur()}
+                                    className="w-20 text-center text-sm font-semibold bg-gray-50 border border-gray-300 rounded px-2 py-1"
+                                  />
+                                </div>
+                                {/* Price - 3 columns */}
+                                <div className="col-span-3 flex flex-col items-center justify-center gap-1">
+                                  {hasTwoPrices ? (
+                                    <div className="flex flex-col gap-1 w-full">
+                                      {/* Price toggle buttons */}
+                                      <div className="flex gap-1 bg-gray-200 p-1 rounded-lg">
+                                        <button
+                                          onClick={() => changePriceType(item.id, 'precio')}
+                                          className={`flex-1 px-2 py-1 text-xs font-semibold rounded transition-all ${(item.priceType || 'precio') === 'precio'
+                                            ? 'bg-white text-gray-800 shadow-sm'
+                                            : 'text-gray-600 hover:text-gray-800'
+                                            }`}
+                                        >
+                                          ${item.precio?.toFixed(2)}
+                                        </button>
+                                        <button
+                                          onClick={() => changePriceType(item.id, 'precio_2')}
+                                          className={`flex-1 px-2 py-1 text-xs font-semibold rounded transition-all ${item.priceType === 'precio_2'
+                                            ? 'bg-white text-gray-800 shadow-sm'
+                                            : 'text-gray-600 hover:text-gray-800'
+                                            }`}
+                                        >
+                                          ${item.precio_2?.toFixed(2)}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="flex flex-col items-center gap-1">
+                                      <span className="text-sm font-semibold text-gray-800">
+                                        ${item.precio?.toFixed(2)}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Total - 2 columns */}
+                                <div className="col-span-2 flex items-center justify-end gap-2">
+                                  <p className="text-sm font-bold text-gray-800">
+                                    ${((item.precioActual || item.precio) * item.cantidadVendida).toFixed(2)}
+                                  </p>
+
+                                  {/* Delete Button */}
+                                  <button
+                                    onClick={() => removeFromCart(item.id)}
+                                    className="p-1 text-[#bb1c49] hover:bg-red-50 rounded shrink-0"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -950,8 +1101,8 @@ const POSSystem = () => {
                         disabled={cart.length === 0 || processingSale}
                         className={`px-4 py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2 
                           ${cart.length === 0 || processingSale
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          : 'bg-[#008cc8] text-white hover:bg-[#007baf]'
+                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            : 'bg-[#008cc8] text-white hover:bg-[#007baf]'
                           }`}
                       >
                         {processingSale ? (
@@ -969,7 +1120,6 @@ const POSSystem = () => {
                 </div>
               </div>
             )}
-
             {/* INVENTARIO - Agregar Productos */}
             {activeTab === 'inventory-add' && (
               <div className="max-w-3xl mx-auto">
@@ -977,7 +1127,6 @@ const POSSystem = () => {
                   <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
                     Agregar Nuevo Producto
                   </h2>
-
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -990,6 +1139,25 @@ const POSSystem = () => {
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008cc8]"
                         placeholder="Ej: Laptop Dell Inspiron"
                       />
+                    </div>
+
+                    {/* Unidad de medida */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Unidad de Medida <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={newProduct.unidad || 'unidad'}
+                        onChange={(e) => setNewProduct({ ...newProduct, unidad: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008cc8]"
+                      >
+                        <option value="unidad">Unidad</option>
+                        <option value="libras">Libras</option>
+                        <option value="kg">Kilogramos</option>
+                        <option value="gramos">Gramos</option>
+                        <option value="litros">Litros</option>
+                        <option value="ml">Mililitros</option>
+                      </select>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -1009,7 +1177,6 @@ const POSSystem = () => {
                           />
                         </div>
                       </div>
-
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           % Ganancia <span className="text-red-500">*</span>
@@ -1025,11 +1192,11 @@ const POSSystem = () => {
                       </div>
                     </div>
 
-                    {/* Vista previa del precio de venta */}
+                    {/* Vista previa del precio de venta 1 */}
                     {newProduct.costo && newProduct.porcentajeGanancia && (
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                         <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium text-gray-800">Precio de Venta Calculado:</span>
+                          <span className="text-sm font-medium text-gray-800">Precio de Venta 1:</span>
                           <span className="text-2xl font-bold text-gray-600">
                             ${calculateSalePrice(newProduct.costo, newProduct.porcentajeGanancia)}
                           </span>
@@ -1040,6 +1207,59 @@ const POSSystem = () => {
                       </div>
                     )}
 
+                    {/* Precio 2 (Opcional) */}
+                    <div className="border-t pt-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <input
+                          type="checkbox"
+                          id="hasPrecio2"
+                          checked={newProduct.hasPrecio2 || false}
+                          onChange={(e) => setNewProduct({
+                            ...newProduct,
+                            hasPrecio2: e.target.checked,
+                            porcentajeGanancia2: e.target.checked ? newProduct.porcentajeGanancia2 : ''
+                          })}
+                          className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-[#008cc8]"
+                        />
+                        <label htmlFor="hasPrecio2" className="text-sm font-medium text-gray-700">
+                          Agregar Precio 2 (Opcional)
+                        </label>
+                      </div>
+
+                      {newProduct.hasPrecio2 && (
+                        <div className="space-y-4 pl-6 border-l-2 border-blue-200">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              % Ganancia para Precio 2
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={newProduct.porcentajeGanancia2 || ''}
+                              onChange={(e) => setNewProduct({ ...newProduct, porcentajeGanancia2: e.target.value })}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008cc8]"
+                              placeholder="Ej: 35"
+                            />
+                          </div>
+
+                          {/* Vista previa del precio de venta 2 */}
+                          {newProduct.costo && newProduct.porcentajeGanancia2 && (
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-medium text-gray-800">Precio de Venta 2:</span>
+                                <span className="text-2xl font-bold text-gray-600">
+                                  ${calculateSalePrice(newProduct.costo, newProduct.porcentajeGanancia2)}
+                                </span>
+                              </div>
+                              <p className="text-s text-gray-600 mt-2">
+                                Ganancia: ${(calculateSalePrice(newProduct.costo, newProduct.porcentajeGanancia2) - parseFloat(newProduct.costo)).toFixed(2)}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1047,19 +1267,20 @@ const POSSystem = () => {
                         </label>
                         <input
                           type="number"
+                          step={newProduct.unidad === 'unidad' ? "1" : "0.01"}
                           value={newProduct.cantidad}
                           onChange={(e) => setNewProduct({ ...newProduct, cantidad: e.target.value })}
                           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008cc8]"
                           placeholder="0"
                         />
                       </div>
-
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Stock Mínimo
                         </label>
                         <input
                           type="number"
+                          step={newProduct.unidad === 'unidad' ? "1" : "0.01"}
                           value={newProduct.minStock}
                           onChange={(e) => setNewProduct({ ...newProduct, minStock: e.target.value })}
                           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008cc8]"
@@ -1084,8 +1305,11 @@ const POSSystem = () => {
                           nombre: '',
                           costo: '',
                           porcentajeGanancia: '',
+                          porcentajeGanancia2: '',
                           cantidad: '',
-                          minStock: ''
+                          minStock: '',
+                          unidad: 'unidad',
+                          hasPrecio2: false
                         })}
                         className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition"
                       >
@@ -1118,6 +1342,7 @@ const POSSystem = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Precio</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Precio 2</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
                       </tr>
                     </thead>
@@ -1135,7 +1360,9 @@ const POSSystem = () => {
                             </span>
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-800">${item.precio}</td>
-                          <td className="px-6 py-4 text-sm">
+                          <td className="px-6 py-4 text-sm text-gray-800">
+                            {item.precio_2 ? `$${item.precio_2.toFixed(2)}` : "-"}
+                          </td>                          <td className="px-6 py-4 text-sm">
                             {item.cantidad === 0 ? (
                               <span className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-semibold">
                                 Sin Stock

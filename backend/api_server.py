@@ -147,6 +147,7 @@ def create_app():
         """Obtener todo el inventario"""
         try:
             data = inventory.get_inventory()
+            print(data)
             return jsonify({'success': True, 'data': data})
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)}), 500
@@ -157,22 +158,26 @@ def create_app():
             data = request.json
             
             # Validar datos requeridos
-            required_fields = ['codigo', 'nombre', 'costo', 'precio']
+            required_fields = ['codigo', 'nombre', 'costo', 'precio_1', 'unidad']
             for field in required_fields:
                 if field not in data:
                     return jsonify({
                         'success': False,
                         'message': f'Campo requerido faltante: {field}'
                     }), 400
-            
+            if data['precio_2'] == None:
+                 data['precio_2'] = 0.0
+
             # Preparar datos del producto con valores por defecto
             product_data = {
                 'codigo': data['codigo'],
                 'nombre': data['nombre'],
                 'cantidad': data.get('cantidad', 0),
                 'costo': float(data['costo']),
-                'precio': float(data['precio']),
-                'minStock': data.get('minStock', 5)
+                'precio_1': float(data['precio_1']),
+                'minStock': data.get('minStock', 5),
+                'unidad': data['unidad'],
+                'precio_2': float(data['precio_2']),
             }
             
             # Guardar producto usando la clase de Google Sheets
@@ -199,7 +204,7 @@ def create_app():
         """Procesar una venta"""
         try:
             cart = request.json.get('cart', [])
-            #print(cart)
+            print(cart)
             vendedor = request.json.get('vendedor', 'Sistema')
 
             result =  inventory.process_sale(cart, vendedor)

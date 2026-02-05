@@ -208,8 +208,9 @@ __marimo__/
 
 # Python
 backend/create_admin.py
-# Google Services Credentials
-credentials.json
+
+# Secrets
+secrets/
 
 # Personal documentation
 certificado.p12

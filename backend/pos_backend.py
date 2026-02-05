@@ -3,11 +3,15 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import hashlib
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import uuid
 
 # Printer
 from escpos.printer import Network
 from decimal import Decimal, ROUND_HALF_UP
+
+BUSINESS_TZ = ZoneInfo("America/Guayaquil")
+
 
 class ReceiptPrinter: 
     def __init__(self):
@@ -237,7 +241,7 @@ class InventoryManager:
     def add_product(self, product_data):
         """Agrega un nuevo producto a la hoja de Inventario"""
         try:
-            now = datetime.now()
+            now = datetime.now(BUSINESS_TZ)
             ultima_actualizacion = now.strftime('%Y-%m-%d %H:%M:%S')
             
             # Obtener el último ID para generar el siguiente
@@ -251,10 +255,13 @@ class InventoryManager:
                 product_data['codigo'],
                 product_data['nombre'],
                 product_data['cantidad'],
+                product_data['unidad'],
                 product_data['costo'],
-                product_data['precio'],
+                product_data['precio_1'],
+                product_data['precio_2'],
                 product_data['minStock'],
-                ultima_actualizacion
+                ultima_actualizacion,
+
             ]
             
             print(f'Producto para insertar: {row}')
@@ -292,51 +299,77 @@ class InventoryManager:
         except:
             return None
     
-    def update_stock(self, product_code, quantity_sold):
+    def update_stock(self, product_code, quantity_sold, price_type):
         """Actualiza el stock después de una venta"""
         try:
+            print("Actualizando stock...")
+
             # Buscar el producto
             cell = self.sheet_inventory.find(product_code)
             row = cell.row
             
+            print("No product")
+
             # Obtener datos del producto
             product_id = self.sheet_inventory.cell(row, 1).value
             product_name = self.sheet_inventory.cell(row, 3).value
-            current_qty = int(self.sheet_inventory.cell(row, 4).value)
-            price = float(self.sheet_inventory.cell(row, 6).value)
-            min_stock = int(self.sheet_inventory.cell(row, 7).value)
+            current_qty = float(self.sheet_inventory.cell(row, 4).value)
+            unidad = self.sheet_inventory.cell(row, 5).value.lower()
+            price_1 = float(self.sheet_inventory.cell(row, 7).value)
+            price_2 = float(self.sheet_inventory.cell(row, 8).value)
+            min_stock = float(self.sheet_inventory.cell(row, 9).value)
+            quantity_sold = float(quantity_sold)
+
+            print("Datos obtenidos")
             
+            if unidad == "unidad" and not quantity_sold.is_integer():
+                print("Unidad is not integer")
+                return {
+                    'success': False,
+                    'error': 'Este producto solo se puede vender en unidades enteras'
+                }
+
             # Verificar si hay suficiente stock
             if current_qty < quantity_sold:
+                print("Datos obtenidos")
                 return {
                     'success': False,
                     'error': 'Stock insuficiente'
                 }
             
             # Calcular nueva cantidad
-            new_qty = current_qty - quantity_sold
+            new_qty = round(current_qty - quantity_sold, 3)
             
             # Actualizar en la hoja
             self.sheet_inventory.update_cell(row, 4, new_qty)
             
             # Actualizar timestamp
-            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            self.sheet_inventory.update_cell(row, 8, timestamp)
+            timestamp = datetime.now(BUSINESS_TZ).strftime('%Y-%m-%d %H:%M:%S')
+            self.sheet_inventory.update_cell(row, 10, timestamp)
             
             # Verificar si requiere alerta
             alert = new_qty <= min_stock
+
+            # Verificar precio
+            if price_type == "precio_2":
+                selected_price = price_2
+            else:
+                selected_price = price_1
             
+            print("Se ha actualizado el stock")
+
+     
             return {
-                'success': True,
-                'product_id': product_id,
-                'product_code': product_code,
-                'product_name': product_name,
-                'price': price,
-                'quantity_sold':quantity_sold,
-                'new_quantity': new_qty,
-                'alert': alert
-            }
-            
+                    'success': True,
+                    'product_id': product_id,
+                    'product_code': product_code,
+                    'product_name': product_name,
+                    'price': selected_price,
+                    'quantity_sold':quantity_sold,
+                    'new_quantity': new_qty,
+                    'alert': alert
+                }
+                
         except Exception as e:
             return {
                 'success': False,
@@ -346,7 +379,7 @@ class InventoryManager:
     def save_sale(self, sale_id, cart_items, total, vendedor='Sistema'):
         """Guarda el detalle de la venta en la hoja de Ventas"""
         try:
-            now = datetime.now()
+            now = datetime.now(BUSINESS_TZ)
             fecha = now.strftime('%Y-%m-%d')
             hora = now.strftime('%H:%M:%S')
             
@@ -386,7 +419,7 @@ class InventoryManager:
     def process_sale(self, cart_items, vendedor='Sistema'):
         """Procesa una venta completa"""
 
-        sale_id = f"VTA-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8]}"
+        sale_id = f"VTA-{datetime.now(BUSINESS_TZ).strftime('%Y%m%d')}-{str(uuid.uuid4())[:8]}"
 
         results = []
         alerts = []
@@ -396,9 +429,11 @@ class InventoryManager:
         # Procesar cada producto        
         for item in cart_items:
             print(f"Processing {item['codigo']}")
+
             result = self.update_stock(
                 item['codigo'],
-                item['cantidad_vendida']
+                item['cantidad_vendida'],
+                item['tipoPrecio']
             )
             
             if not result['success']:
@@ -411,6 +446,7 @@ class InventoryManager:
 
             # Calcular total
             subtotal = result['price']*result['quantity_sold']
+
             total_sale += subtotal
             
             # Guardar detalles para el historial
@@ -516,7 +552,7 @@ class InventoryManager:
         """Obtiene un resumen de ventas del día"""
         try:
             if date is None:
-                date = datetime.now().strftime('%Y-%m-%d')
+                date = datetime.now(BUSINESS_TZ).strftime('%Y-%m-%d')
             
             records = self.sheet_sales.get_all_records()
             daily_sales = [r for r in records if r['Fecha'] == date]
@@ -572,12 +608,15 @@ class InventoryManager:
             # Obtener ventas e inventario
             sales = self.sheet_sales.get_all_records()
             inventory = self.sheet_inventory.get_all_records()
+
+            print(sales)
+            print(inventory)
             
             # Diccionario de costos
             costs_dict = {item['Codigo']: float(item.get('Costo', 0)) for item in inventory}
             
             # Determinar rango de fechas según período
-            now = datetime.now()
+            now = datetime.now(BUSINESS_TZ)
             
             if period == 'today':
                 start_date = now.replace(hour=0, minute=0, second=0)
@@ -609,12 +648,18 @@ class InventoryManager:
             filtered_sales = []
             for sale in sales:
                 try:
-                    sale_datetime = datetime.strptime(f"{sale['Fecha']} {sale['Hora']}", '%Y-%m-%d %H:%M:%S')
+                    sale_datetime = datetime.strptime(
+                        f"{sale['Fecha']} {sale['Hora']}",
+                        '%Y-%m-%d %H:%M:%S'
+                    ).replace(tzinfo=BUSINESS_TZ)
+                    
                     if start_date <= sale_datetime <= end_date:
                         filtered_sales.append(sale)
                 except:
                     continue
-            
+            print("filtered sales")
+            print(filtered_sales)
+
             # Calcular totales
             total_ingresos = Decimal("0.000")
             total_costos = Decimal("0.000")
